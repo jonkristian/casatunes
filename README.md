@@ -10,7 +10,7 @@ Download or clone and copy the folder `custom/components/casatunes` into your `c
 
 ### Installation via Home Assistant Community Store (HACS)
 1. Ensure [HACS](http://hacs.xyz/) is installed.
-2. Search for and install the "Wasteplan TRV" integration
+2. Search for and install the "CasaTunes" integration
 3. Configure the sensor
 4. Restart Home Assistant
 
