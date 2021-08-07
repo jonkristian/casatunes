@@ -15,7 +15,8 @@
     }
   ],
   "codeowners": [
-    "@jonkristian"
+    "@jonkristian",
+    "@alphasixtyfive"
   ],
   "iot_class": "local_polling"
 }
