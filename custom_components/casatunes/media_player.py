@@ -1,15 +1,12 @@
 """Support for the CasaTunes media player."""
 from __future__ import annotations
 
-import datetime as dt
 import logging
 
+from homeassistant.util.dt import utcnow
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from pycasatunes.objects.zone import CasaTunesZone
-from pycasatunes.objects.source import CasaTunesSource
-from pycasatunes.objects.media import CasaTunesMedia
-from pycasatunes.exceptions import CasaException
 
 import voluptuous as vol
 
@@ -52,7 +49,6 @@ import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.network import is_internal_request
 from homeassistant.helpers.entity import Entity
-import homeassistant.util.dt as dt_util
 
 from .const import DOMAIN
 from . import CasaTunesDataUpdateCoordinator, CasaTunesDeviceEntity
@@ -113,9 +109,10 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
         self._attr_unique_id = f"{unique_id}_{zone.ZoneID}"
         self._attr_supported_features = SUPPORT_CASATUNES
         self._zone_id = zone.ZoneID
+        self._media_position_updated_at = None
 
     async def async_added_to_hass(self):
-        """Run when this Entity has been added to HA."""
+        """Entity being added to hass."""
         await super().async_added_to_hass()
         self.coordinator.entities.append(self)
 
@@ -144,10 +141,12 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
 
     @property
     def is_master(self) -> bool:
+        """Return boolean true if master"""
         return self.zone.SharedRoomID and self.zone.MasterMode
 
     @property
     def is_client(self) -> bool:
+        """Return boolean true if client"""
         return self.zone.SharedRoomID and not self.zone.MasterMode
 
     @property
@@ -228,24 +227,23 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
         """Duration of current playing media in seconds."""
         if self._media_playback_trackable():
             return self.coordinator.data.media[self.zone.SourceID].CurrSong.Duration
-
         return None
 
     @property
     def media_position(self):
         """Position of current playing media in seconds."""
         if self._media_playback_trackable():
+            self._media_position_updated_at = utcnow()
             return self.coordinator.data.media[self.zone.SourceID].CurrProgress
-
         return None
 
     @property
-    def media_position_updated_at(self) -> dt.datetime | None:
+    def media_position_updated_at(self):
         """When was the position of the current playing media valid.
         Returns value from homeassistant.util.dt.utcnow().
         """
         if self._media_playback_trackable():
-            return self.coordinator.data.media[self.zone.SourceID].last_updated_at
+            return self._media_position_updated_at
 
         return None
 
@@ -317,8 +315,9 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
     async def async_media_seek(self, position):
         """Send seek command."""
         await self.coordinator.data.player_action(
-            self.zone_id, f"position={int(position)}"
+            self.zone_id, "Position", int(position)
         )
+        self._media_position_updated_at = utcnow()
         await self.coordinator.async_refresh()
 
     async def async_media_previous_track(self):
