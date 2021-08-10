@@ -8,72 +8,68 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from pycasatunes.objects.zone import CasaTunesZone
 
-import voluptuous as vol
-
 from homeassistant.components.media_player import (
-    BrowseMedia,
     DEVICE_CLASS_SPEAKER,
     MediaPlayerEntity,
 )
 
 from homeassistant.components.media_player.const import (
+    SUPPORT_BROWSE_MEDIA,
     MEDIA_TYPE_MUSIC,
     MEDIA_TYPE_PLAYLIST,
-    SUPPORT_BROWSE_MEDIA,
-    SUPPORT_PLAY_MEDIA,
-    SUPPORT_PLAY,
+    SUPPORT_CLEAR_PLAYLIST,
+    SUPPORT_GROUPING,
+    SUPPORT_NEXT_TRACK,
     SUPPORT_PAUSE,
-    SUPPORT_STOP,
+    SUPPORT_PLAY,
+    SUPPORT_PLAY_MEDIA,
+    SUPPORT_PREVIOUS_TRACK,
+    SUPPORT_SEEK,
     SUPPORT_SELECT_SOURCE,
+    # SUPPORT_SELECT_SOUND_MODE,
+    SUPPORT_SHUFFLE_SET,
+    SUPPORT_STOP,
     SUPPORT_TURN_OFF,
     SUPPORT_TURN_ON,
     SUPPORT_VOLUME_MUTE,
     SUPPORT_VOLUME_SET,
-    SUPPORT_NEXT_TRACK,
-    SUPPORT_PREVIOUS_TRACK,
-    SUPPORT_SEEK,
-    SUPPORT_SHUFFLE_SET,
-    SUPPORT_GROUPING,
 )
 
-from homeassistant.components.media_player.errors import BrowseError
 from homeassistant.const import (
-    ATTR_ENTITY_ID,
     STATE_IDLE,
     STATE_ON,
     STATE_OFF,
     STATE_PAUSED,
     STATE_PLAYING,
 )
-import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers import entity_platform
-from homeassistant.helpers.network import is_internal_request
 from homeassistant.helpers.entity import Entity
 
 from .const import DOMAIN
+from .browse_media import build_item_response
 from . import CasaTunesDataUpdateCoordinator, CasaTunesDeviceEntity
 
 SUPPORT_CASATUNES = (
-    SUPPORT_SELECT_SOURCE
-    | SUPPORT_TURN_OFF
-    | SUPPORT_TURN_ON
-    | SUPPORT_VOLUME_SET
-    | SUPPORT_VOLUME_MUTE
+    SUPPORT_BROWSE_MEDIA
+    | SUPPORT_CLEAR_PLAYLIST
+    | SUPPORT_GROUPING
     | SUPPORT_NEXT_TRACK
+    | SUPPORT_PAUSE
+    | SUPPORT_PLAY
+    | SUPPORT_PLAY_MEDIA
     | SUPPORT_PREVIOUS_TRACK
     | SUPPORT_SEEK
-    | SUPPORT_PLAY
-    | SUPPORT_PAUSE
-    | SUPPORT_STOP
+    | SUPPORT_SELECT_SOURCE
     | SUPPORT_SHUFFLE_SET
-    | SUPPORT_GROUPING
+    | SUPPORT_STOP
+    | SUPPORT_TURN_OFF
+    | SUPPORT_TURN_ON
+    | SUPPORT_VOLUME_MUTE
+    | SUPPORT_VOLUME_SET
 )
 
 STATUS_TO_STATES = {0: STATE_IDLE, 1: STATE_PAUSED, 2: STATE_PLAYING, 3: STATE_ON}
 
 _LOGGER = logging.getLogger(__name__)
-
-ATTR_CASATUNES_GROUP = "casatunes_group"
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -82,8 +78,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     media_players: list[Entity] = []
 
+    unique_id = coordinator.data.system.attributes["MACAddress"]
+
     for zone in coordinator.data.zones:
-        unique_id = coordinator.data.system.attributes["MACAddress"]
         media_players.append(CasaTunesMediaPlayer(coordinator, zone, unique_id))
 
     async_add_entities(media_players)
@@ -108,6 +105,7 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
 
         self._attr_unique_id = f"{unique_id}_{zone.ZoneID}"
         self._attr_supported_features = SUPPORT_CASATUNES
+        self._server = coordinator
         self._zone_id = zone.ZoneID
         self._media_position_updated_at = None
 
@@ -123,10 +121,15 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
 
     def _media_playback_trackable(self) -> bool:
         """Detect if we have enough media data to track playback."""
-        if self.coordinator.data.media[self.zone.SourceID].CurrSong.Duration is None:
+        if (
+            self.coordinator.data.nowplaying[self.zone.SourceID].CurrSong.Duration
+            is None
+        ):
             return False
 
-        return self.coordinator.data.media[self.zone.SourceID].CurrSong.Duration > 0
+        return (
+            self.coordinator.data.nowplaying[self.zone.SourceID].CurrSong.Duration > 0
+        )
 
     def _casatunes_entities(self) -> list[CasaTunesMediaPlayer]:
         """Return all media player entities of the casatunes system."""
@@ -157,9 +160,8 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
     @property
     def name(self) -> str | None:
         """Return the name of the device."""
-        # TODO: mini-media-player already appends +1, +2 to grouped sones.
-        # if self.zone.GroupName is not None:
-        #     return self.zone.GroupName
+        if self.zone.GroupName is not None:
+            return self.zone.GroupName
 
         return self.zone.Name
 
@@ -167,7 +169,7 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
     def state(self) -> str | None:
         """Return the state of the device."""
         if self.zone and self.zone.Power is not False:
-            state = self.coordinator.data.media[self.zone.SourceID].Status
+            state = self.coordinator.data.nowplaying[self.zone.SourceID].Status
             return STATUS_TO_STATES.get(state, None)
         else:
             return STATE_OFF
@@ -175,7 +177,7 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
     @property
     def shuffle(self):
         """Boolean if shuffle is enabled."""
-        return self.coordinator.data.media[self.zone.SourceID].ShuffleMode
+        return self.coordinator.data.nowplaying[self.zone.SourceID].ShuffleMode
 
     @property
     def volume_level(self) -> str | None:
@@ -205,28 +207,30 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
     @property
     def media_track(self):
         """Return the track number of current media (Music track only)."""
-        return self.coordinator.data.media[self.zone.SourceID].QueueSongIndex
+        return self.coordinator.data.nowplaying[self.zone.SourceID].QueueSongIndex
 
     @property
     def media_title(self):
         """Title of current playing media."""
-        return self.coordinator.data.media[self.zone.SourceID].CurrSong.Title
+        return self.coordinator.data.nowplaying[self.zone.SourceID].CurrSong.Title
 
     @property
     def media_artist(self):
         """Artist of current playing media, music track only."""
-        return self.coordinator.data.media[self.zone.SourceID].CurrSong.Artists
+        return self.coordinator.data.nowplaying[self.zone.SourceID].CurrSong.Artists
 
     @property
     def media_album_name(self):
         """Album name of current playing media, music track only."""
-        return self.coordinator.data.media[self.zone.SourceID].CurrSong.Album
+        return self.coordinator.data.nowplaying[self.zone.SourceID].CurrSong.Album
 
     @property
     def media_duration(self) -> int | None:
         """Duration of current playing media in seconds."""
         if self._media_playback_trackable():
-            return self.coordinator.data.media[self.zone.SourceID].CurrSong.Duration
+            return self.coordinator.data.nowplaying[
+                self.zone.SourceID
+            ].CurrSong.Duration
         return None
 
     @property
@@ -234,7 +238,7 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
         """Position of current playing media in seconds."""
         if self._media_playback_trackable():
             self._media_position_updated_at = utcnow()
-            return self.coordinator.data.media[self.zone.SourceID].CurrProgress
+            return self.coordinator.data.nowplaying[self.zone.SourceID].CurrProgress
         return None
 
     @property
@@ -256,7 +260,11 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
     @property
     def media_image_url(self):
         """Image url of current playing media."""
-        return self.coordinator.data.media[self.zone.SourceID].CurrSong.ArtworkURI
+        return self.coordinator.data.nowplaying[self.zone.SourceID].CurrSong.ArtworkURI
+
+    @property
+    def media_image_remotely_accessible(self):
+        return True
 
     @property
     def group_members(self) -> list[str] | None:
@@ -394,3 +402,22 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
         await self.coordinator.data.zone_unjoin(self.zone_master, self.zone_id)
         await self.coordinator.async_refresh()
         await self.sync_master()
+
+    async def async_browse_media(self, media_content_type=None, media_content_id=None):
+        """Implement the websocket media browsing helper."""
+        return await build_item_response(
+            self._zone_id,
+            self.coordinator,
+            media_content_type,
+            media_content_id,
+        )
+
+    async def async_play_media(self, media_type, media_id, **kwargs):
+        """Send the play_media command to the media player."""
+        _LOGGER.debug("Playback request for %s / %s", media_type, media_id)
+        await self.coordinator.data.play_media(self.zone_id, media_id)
+        await self.coordinator.async_refresh()
+
+    async def async_clear_playlist(self):
+        """Send the media player the command for clear playlist."""
+        await self._player.async_clear_playlist()

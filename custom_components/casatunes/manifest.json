@@ -2,11 +2,10 @@
   "domain": "casatunes",
   "name": "CasaTunes",
   "config_flow": true,
-  "documentation": "https://github.com/jonkristian/casatunes",
-  "issue_tracker": "https://github.com/jonkristian/casatunes/issues",
+  "documentation": "https://www.home-assistant.io/integrations/casatunes",
   "version": "0.1.0",
   "requirements": [
-    "pycasatunes==0.1.0"
+    "pycasatunes==0.0.1"
   ],
   "ssdp": [
     {
@@ -15,8 +14,7 @@
     }
   ],
   "codeowners": [
-    "@jonkristian",
-    "@alphasixtyfive"
+    "@jonkristian"
   ],
   "iot_class": "local_polling"
 }

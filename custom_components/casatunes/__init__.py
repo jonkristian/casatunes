@@ -98,7 +98,7 @@ class CasaTunesEntity(CoordinatorEntity):
         device_id: str,
         zone_id: str,
     ) -> None:
-        """Initialize the AL-KO entity."""
+        """Initialize the CasaTunes entity."""
         super().__init__(coordinator)
         self._zone_id = zone_id
         self._zone = zone
@@ -124,7 +124,6 @@ class CasaTunesEntity(CoordinatorEntity):
     def zone(self) -> CasaTunesZone:
         """Get the CasaTunes Zones."""
         return self.coordinator.data.zones_dict[self._zone_id]
-
 
 class CasaTunesDeviceEntity(CasaTunesEntity):
     """Defines a CasaTunes device entity."""
