@@ -3,9 +3,9 @@
   "name": "CasaTunes",
   "config_flow": true,
   "documentation": "https://www.home-assistant.io/integrations/casatunes",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "requirements": [
-    "pycasatunes==0.0.1"
+    "pycasatunes==0.1.1"
   ],
   "ssdp": [
     {
