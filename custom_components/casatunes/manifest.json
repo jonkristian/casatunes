@@ -3,7 +3,7 @@
   "name": "CasaTunes",
   "config_flow": true,
   "documentation": "https://www.home-assistant.io/integrations/casatunes",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "requirements": [
     "pycasatunes==0.1.1"
   ],
