@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import logging
 
+import voluptuous as vol
+
 from homeassistant.util.dt import utcnow
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
@@ -43,8 +45,9 @@ from homeassistant.const import (
     STATE_PLAYING,
 )
 from homeassistant.helpers.entity import Entity
+from homeassistant.helpers import entity_platform
 
-from .const import DOMAIN
+from .const import ATTR_KEYWORD, DOMAIN, SERVICE_SEARCH
 from .browse_media import build_item_response
 from . import CasaTunesDataUpdateCoordinator, CasaTunesDeviceEntity
 
@@ -69,6 +72,8 @@ SUPPORT_CASATUNES = (
 
 STATUS_TO_STATES = {0: STATE_IDLE, 1: STATE_PAUSED, 2: STATE_PLAYING, 3: STATE_ON}
 
+SEARCH_SCHEMA = {vol.Required(ATTR_KEYWORD): str}
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -84,6 +89,13 @@ async def async_setup_entry(hass, entry, async_add_entities):
         media_players.append(CasaTunesMediaPlayer(coordinator, zone, unique_id))
 
     async_add_entities(media_players)
+
+    platform = entity_platform.async_get_current_platform()
+    platform.async_register_entity_service(
+        SERVICE_SEARCH,
+        SEARCH_SCHEMA,
+        "search",
+    )
 
 
 class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
@@ -168,7 +180,7 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
     @property
     def state(self) -> str | None:
         """Return the state of the device."""
-        if self.zone and self.zone.Power is not False:
+        if self.zone.Power is True:
             state = self.coordinator.data.nowplaying[self.zone.SourceID].Status
             return STATUS_TO_STATES.get(state, None)
         else:
@@ -421,3 +433,7 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
     async def async_clear_playlist(self):
         """Send the media player the command for clear playlist."""
         await self._player.async_clear_playlist()
+
+    async def search(self, keyword):
+        """Emulate opening the search screen and entering the search keyword."""
+        await self.coordinator.data.search_media(self.zone_id, keyword)

@@ -130,7 +130,10 @@ class CasaTunesDeviceEntity(CasaTunesEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        """Return device information about this CasaTunes instance."""
+        """Return device information about this CasaTunes device."""
+        if self._device_id is None:
+            return None
+
         return {
             "identifiers": {(DOMAIN, self._device_id)},
             "manufacturer": "CasaTunes",
