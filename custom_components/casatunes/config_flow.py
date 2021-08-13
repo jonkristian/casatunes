@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 
 from pycasatunes import CasaTunes
 from pycasatunes.exceptions import CasaException
+import async_timeout
 import voluptuous as vol
 
 from homeassistant.components.ssdp import (
@@ -20,6 +21,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import DiscoveryInfoType
+from homeassistant.helpers.device_registry import format_mac
 
 from .const import DOMAIN
 
@@ -38,11 +40,10 @@ async def validate_input(hass: HomeAssistant, data: dict) -> dict:
     session = async_get_clientsession(hass)
     casa = CasaTunes(session, data[CONF_HOST])
     system = await casa.get_system()
-    _LOGGER.info(system)
 
     return {
         "title": system.AppName,
-        "mac_address": system.MACAddress,
+        "mac_address": format_mac(system.MACAddress),
     }
 
 
@@ -52,9 +53,9 @@ class CasaTunesConfigFlow(ConfigFlow, domain=DOMAIN):
     def __init__(self):
         """Set up the instance."""
         self.discovery_info = {}
-        # self.data_schema = {
-        #     vol.Required("host"): str,
-        # }
+        self.data_schema = {
+            vol.Required("host"): str,
+        }
 
     @callback
     def _show_form(self, errors: dict | None = None) -> FlowResult:
@@ -87,18 +88,28 @@ class CasaTunesConfigFlow(ConfigFlow, domain=DOMAIN):
                 step_id="user", data_schema=vol.Schema(self.data_schema)
             )
 
-        await self.async_set_unique_id(info["mac_address"])
-        self._abort_if_unique_id_configured(updates={CONF_HOST: user_input[CONF_HOST]})
+        await self.async_set_unique_id(format_mac(info["mac_address"]))
+        self._abort_if_unique_id_configured(updates = {CONF_HOST: user_input[CONF_HOST]})
 
-        return self.async_create_entry(title=info["title"], data=user_input)
+        return self.async_create_entry(
+            title=info["title"], 
+            data=user_input,
+        )
 
     async def async_step_ssdp(self, discovery_info: DiscoveryInfoType) -> FlowResult:
         """Handle a flow initialized by discovery."""
         host = urlparse(discovery_info[ATTR_SSDP_LOCATION]).hostname
         name = discovery_info[ATTR_UPNP_FRIENDLY_NAME]
-        # serial_number = discovery_info[ATTR_UPNP_SERIAL]
 
-        await self.async_set_unique_id(host)
+        try:
+            mac = await self._async_get_mac(host)
+        except CasaException:
+            return self.async_abort(reason="cannot_connect")
+        except Exception:  # pylint: disable=broad-except
+            _LOGGER.exception("Unknown error trying to connect")
+            return self.async_abort(reason=ERROR_UNKNOWN)
+
+        await self.async_set_unique_id(format_mac(mac))
         self._abort_if_unique_id_configured(updates={CONF_HOST: host})
 
         self.context.update({"title_placeholders": {"name": name}})
@@ -122,3 +133,14 @@ class CasaTunesConfigFlow(ConfigFlow, domain=DOMAIN):
             title=self.discovery_info[CONF_NAME],
             data=self.discovery_info,
         )
+
+    async def _async_get_mac(self, host: str) -> str:
+        """Get system MAC address."""
+        session = async_get_clientsession(self.hass)
+        casa = CasaTunes(session, host)
+
+        with async_timeout.timeout(30):
+            system = await casa.get_system()
+        
+        if system.MACAddress is not None:
+            return system.MACAddress

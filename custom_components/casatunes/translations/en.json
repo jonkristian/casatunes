@@ -1,14 +1,26 @@
 {
+    "title": "CasaTunes",
     "config": {
-        "abort": {
-            "no_devices_found": "No devices found on the network",
-            "single_instance_allowed": "Already configured. Only a single configuration possible."
-        },
         "step": {
-            "confirm": {
+            "user": {
+                "title": "Fill in your CasaTunes IP Address",
+                "data": {
+                    "ip": "CasaTunes IP Adress"
+                }
+            },
+            "discovery_confirm": {
                 "description": "Do you want to start set up?"
+            },
+            "reauth_confirm": {
+                "title": "Fill in your CasaTunes IP Address",
+                "data": {
+                    "ip": "CasaTunes IP Adress"
+                }
             }
+        },
+        "abort": {
+            "already_configured": "Already configured. Only a single configuration possible.",
+            "already_in_progress": "Already in progress."
         }
-    },
-    "title": "CasaTunes"
+    }
 }

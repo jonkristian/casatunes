@@ -3,14 +3,20 @@
   "config": {
     "step": {
       "user": {
-        "title": "Enter your CasaTunes information.",
+        "title": "[%key:common::config_flow::title:via_hassio_addon%]",
         "data": {
-          "host": "[%key:common::config_flow::data::host%]"
+          "ip": "[%key:common::config_flow::data::ip%]"
         }
       },
       "discovery_confirm": {
         "title": "CasaTunes",
-        "description": "Do you want to set up CasaTunes?"
+        "description": "[%key:common::description::confirm_setup%]"
+      },
+      "reauth_confirm": {
+        "title": "[%key:common::config_flow::title::reauth%]",
+        "data": {
+          "ip": "[%key:common::config_flow::data::ip%]"
+        }
       }
     },
     "abort": {
