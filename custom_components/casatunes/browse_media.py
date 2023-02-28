@@ -13,12 +13,15 @@ from homeassistant.components.media_player.errors import BrowseError
 class UnknownMediaType(BrowseError):
     """Unknown media type."""
 
+
 BROWSE_LIMIT = 1000
 
 _LOGGER = logging.getLogger(__name__)
 
 
-async def build_item_response(zone_id, casa_server, media_content_type=None, media_content_id=None):
+async def build_item_response(
+    zone_id, casa_server, media_content_type=None, media_content_id=None
+):
     """Implement the websocket media browsing helper."""
     try:
         _LOGGER.debug("browse_media: %s: %s", media_content_type, media_content_id)
@@ -39,7 +42,11 @@ async def item_payload(casa_server, item):
     thumbnail = None
     image_id = item.get("ArtworkURI")
     if image_id:
-        thumbnail = image_id if image_id.startswith("http://") else await casa_server.data.get_image(image_id)
+        thumbnail = (
+            image_id
+            if image_id.startswith(("http://", "https://"))
+            else await casa_server.data.get_image(image_id)
+        )
 
     media_content_id = item["ID"]
 
@@ -92,8 +99,8 @@ async def library_payload(casa_server, zone_id, media_content_id):
     _LOGGER.debug("Result detail %s", result_detail)
 
     list_title = "Browse Media"
-    if 'Title' in result_detail:
-        list_title = result_detail['Title']
+    if "Title" in result_detail:
+        list_title = result_detail["Title"]
 
     library_info = BrowseMedia(
         title=list_title,
