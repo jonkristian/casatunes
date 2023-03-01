@@ -13,6 +13,8 @@ from homeassistant.components.media_player.errors import BrowseError
 class UnknownMediaType(BrowseError):
     """Unknown media type."""
 
+CT_COLLECTION = 8
+CT_ALLOWSELECT = 8192
 
 BROWSE_LIMIT = 1000
 
@@ -48,23 +50,25 @@ async def item_payload(casa_server, item):
             else await casa_server.data.get_image(image_id)
         )
 
-    media_content_id = item["ID"]
+    flags = item["Flags"]
 
-    if item.get("QueueType") == "NONE":
-        media_content_type = "library"
-        media_class = MEDIA_CLASS_DIRECTORY
-        can_play = False
-        can_expand = True
-    elif item.get("Track"):
-        media_content_type = "track"
-        media_class = MEDIA_CLASS_TRACK
-        can_expand = False
-        can_play = True
-    else:
+    if (flags & CT_COLLECTION) and (flags & CT_ALLOWSELECT):
         media_content_type = "library"
         media_class = MEDIA_CLASS_PLAYLIST
         can_play = True
         can_expand = True
+    elif (flags & CT_COLLECTION):
+        media_content_type = "library"
+        media_class = MEDIA_CLASS_DIRECTORY
+        can_play = False
+        can_expand = True
+    else:
+        media_content_type = "track"
+        media_class = MEDIA_CLASS_TRACK
+        can_expand = False
+        can_play = True
+
+    media_content_id = item["ID"]
 
     payload = {
         "title": title,
