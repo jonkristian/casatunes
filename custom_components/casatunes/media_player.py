@@ -134,14 +134,16 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
     def _media_playback_trackable(self) -> bool:
         """Detect if we have enough media data to track playback."""
         if (
-            self.coordinator.data.nowplaying[self.zone.SourceID].CurrSong.Duration
-            is None
+            0 <= self.zone.SourceID < len(self.coordinator.data.nowplaying)
+            and self.coordinator.data.nowplaying[self.zone.SourceID].CurrSong.Duration
+            is not None
         ):
-            return False
+            return (
+                self.coordinator.data.nowplaying[self.zone.SourceID].CurrSong.Duration
+                > 0
+            )
 
-        return (
-            self.coordinator.data.nowplaying[self.zone.SourceID].CurrSong.Duration > 0
-        )
+        return False
 
     def _casatunes_entities(self) -> list[CasaTunesMediaPlayer]:
         """Return all media player entities of the casatunes system."""
@@ -180,16 +182,23 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
     @property
     def state(self) -> str | None:
         """Return the state of the device."""
-        if self.zone.Power is True:
-            state = self.coordinator.data.nowplaying[self.zone.SourceID].Status
-            return STATUS_TO_STATES.get(state, None)
-        else:
-            return STATE_OFF
+        if self.zone.Power:
+            if 0 <= self.zone.SourceID < len(self.coordinator.data.nowplaying):
+                curr_song = self.coordinator.data.nowplaying[
+                    self.zone.SourceID
+                ].CurrSong
+                if curr_song is not None:
+                    state = self.coordinator.data.nowplaying[self.zone.SourceID].Status
+                    return STATUS_TO_STATES.get(state, None)
+            return STATE_ON
+        return STATE_OFF
 
     @property
     def shuffle(self):
         """Boolean if shuffle is enabled."""
-        return self.coordinator.data.nowplaying[self.zone.SourceID].ShuffleMode
+        if 0 <= self.zone.SourceID < len(self.coordinator.data.nowplaying):
+            return self.coordinator.data.nowplaying[self.zone.SourceID].ShuffleMode
+        return None
 
     @property
     def volume_level(self) -> str | None:
@@ -219,22 +228,30 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
     @property
     def media_track(self):
         """Return the track number of current media (Music track only)."""
-        return self.coordinator.data.nowplaying[self.zone.SourceID].QueueSongIndex
+        if 0 <= self.zone.SourceID < len(self.coordinator.data.nowplaying):
+            return self.coordinator.data.nowplaying[self.zone.SourceID].QueueSongIndex
+        return None
 
     @property
     def media_title(self):
         """Title of current playing media."""
-        return self.coordinator.data.nowplaying[self.zone.SourceID].CurrSong.Title
+        if 0 <= self.zone.SourceID < len(self.coordinator.data.nowplaying):
+            return self.coordinator.data.nowplaying[self.zone.SourceID].CurrSong.Title
+        return None
 
     @property
     def media_artist(self):
         """Artist of current playing media, music track only."""
-        return self.coordinator.data.nowplaying[self.zone.SourceID].CurrSong.Artists
+        if 0 <= self.zone.SourceID < len(self.coordinator.data.nowplaying):
+            return self.coordinator.data.nowplaying[self.zone.SourceID].CurrSong.Artists
+        return None
 
     @property
     def media_album_name(self):
         """Album name of current playing media, music track only."""
-        return self.coordinator.data.nowplaying[self.zone.SourceID].CurrSong.Album
+        if 0 <= self.zone.SourceID < len(self.coordinator.data.nowplaying):
+            return self.coordinator.data.nowplaying[self.zone.SourceID].CurrSong.Album
+        return None
 
     @property
     def media_duration(self) -> int | None:
@@ -272,7 +289,11 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
     @property
     def media_image_url(self):
         """Image url of current playing media."""
-        return self.coordinator.data.nowplaying[self.zone.SourceID].CurrSong.ArtworkURI
+        if 0 <= self.zone.SourceID < len(self.coordinator.data.nowplaying):
+            return self.coordinator.data.nowplaying[
+                self.zone.SourceID
+            ].CurrSong.ArtworkURI
+        return None
 
     @property
     def media_image_remotely_accessible(self):
@@ -432,7 +453,7 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
 
     async def async_clear_playlist(self):
         """Send the media player the command for clear playlist."""
-        await self._player.async_clear_playlist()
+        await self.coordinator.data.clear_playlist(self.zone.SourceID)
 
     async def search(self, keyword):
         """Emulate opening the search screen and entering the search keyword."""
