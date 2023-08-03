@@ -6,6 +6,7 @@ import logging
 import voluptuous as vol
 
 from homeassistant.util.dt import utcnow
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from pycasatunes.objects.zone import CasaTunesZone
@@ -47,7 +48,7 @@ from homeassistant.const import (
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers import entity_platform
 
-from .const import ATTR_KEYWORD, DOMAIN, SERVICE_SEARCH
+from .const import DOMAIN, SERVICE_SEARCH
 from .browse_media import build_item_response
 from . import CasaTunesDataUpdateCoordinator, CasaTunesDeviceEntity
 
@@ -72,7 +73,12 @@ SUPPORT_CASATUNES = (
 
 STATUS_TO_STATES = {0: STATE_IDLE, 1: STATE_PAUSED, 2: STATE_PLAYING, 3: STATE_ON}
 
-SEARCH_SCHEMA = {vol.Required(ATTR_KEYWORD): str}
+SEARCH_SCHEMA = {
+    vol.Optional("mode"): cv.string,
+    vol.Optional("keyword_album"): cv.string,
+    vol.Optional("keyword_artist"): cv.string,
+    vol.Optional("keyword_track_name"): cv.string,
+}
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -398,7 +404,7 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
         """Select input source."""
         for source_item in self.coordinator.data.sources:
             if source_item.Name == source:
-                """If zone is a client on a zone, we should leave."""
+                # If zone is a client on a zone, we should leave.
                 await self.coordinator.data.change_source(
                     self.zone_id, source_item.SourceID
                 )
@@ -414,7 +420,7 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
             str(group_members),
         )
 
-        """Make sure self.zone is or becomes master."""
+        # Make sure self.zone is or becomes master.
         await self.coordinator.data.zone_master(self.zone_id, True)
 
         entities = [
@@ -445,7 +451,7 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
             media_content_id,
         )
 
-    async def async_play_media(self, media_type, media_id, **kwargs):
+    async def async_play_media(self, media_type, media_id):
         """Send the play_media command to the media player."""
         _LOGGER.debug("Playback request for %s / %s", media_type, media_id)
         await self.coordinator.data.play_media(self.zone_id, media_id)
@@ -455,6 +461,24 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
         """Send the media player the command for clear playlist."""
         await self.coordinator.data.clear_playlist(self.zone.SourceID)
 
-    async def search(self, keyword):
+    async def search(self, **kwargs):
         """Emulate opening the search screen and entering the search keyword."""
-        await self.coordinator.data.search_media(self.zone_id, keyword)
+        query = {}
+        mode = "add"
+
+        if isinstance(kwargs.get("mode"), str):
+            mode = kwargs["mode"].strip()
+
+        if isinstance(kwargs.get("keyword_album"), str):
+            query["album"] = kwargs["keyword_album"].strip()
+
+        if isinstance(kwargs.get("keyword_artist"), str):
+            query["artist"] = kwargs["keyword_artist"].strip()
+
+        if isinstance(kwargs.get("keyword_track_name"), str):
+            query["track"] = kwargs["keyword_track_name"].strip()
+
+        media_id = await self.coordinator.data.search_media(self._zone_id, query)
+
+        if media_id:
+            await self.coordinator.data.queue_media(self.zone_id, media_id, mode)

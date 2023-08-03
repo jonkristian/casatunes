@@ -1,15 +1,44 @@
 search:
   name: Search
-  description: Emulates opening the search screen and entering the search keyword.
+  description: Search for and add media in various ways.
+
   target:
     entity:
       integration: casatunes
       domain: media_player
   fields:
-    keyword:
-      name: Keyword
-      description: The keyword to search for.
-      required: true
-      example: "Pearl Jam"
+
+    keyword_artist:
+      name: Search artist
+      description: The keywords to search for in artists.
+      example: The Beatles
+      selector:
+        text:
+
+    keyword_album:
+      name: Search album title
+      description: The keywords to search for in album titles.
+      example: The White Album
+      selector:
+        text:
+
+    keyword_track_name:
+      name: Search track name
+      description: The keywords to search for in track names.
+      example: Helter Skelter
+      selector:
+        text:
+
+    mode:
+      name: Play mode
+      description: "
+        How you want to add the media, default is `add`.
+        `playNow` (Replace Queue Items and Play Now)
+        `playShuffle` (same as playNow but with shuffle enabled)
+        `playUnshuffle` (same as playNow but with shuffle disabled)
+        `add` (Add Items to Queue),
+        `addplay` (Add Items to Queue and start playing the first newly added item)
+        "
+      example: add
       selector:
         text:
