@@ -48,7 +48,7 @@ from homeassistant.const import (
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers import entity_platform
 
-from .const import DOMAIN, SERVICE_SEARCH
+from .const import DOMAIN, SERVICE_SEARCH, SERVICE_TTS, SERVICE_DOORBELL
 from .browse_media import build_item_response
 from . import CasaTunesDataUpdateCoordinator, CasaTunesDeviceEntity
 
@@ -80,6 +80,23 @@ SEARCH_SCHEMA = {
     vol.Optional("keyword_track_name"): cv.string,
 }
 
+TTS_SCHEMA = {
+    vol.Required("input"): cv.string,
+    vol.Optional("language_code"): cv.string,
+    vol.Optional("gender"): cv.string,
+    vol.Optional("voice"): cv.string,
+    vol.Optional("pre_wait"): cv.positive_int,
+    vol.Optional("post_wait"): cv.positive_int,
+    vol.Optional("volume"): cv.positive_int,
+}
+
+DOORBELL_SCHEMA = {
+    vol.Optional("chime"): cv.string,
+    vol.Optional("pre_wait"): cv.positive_int,
+    vol.Optional("post_wait"): cv.positive_int,
+    vol.Optional("volume"): cv.positive_int,
+}
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -97,10 +114,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
     async_add_entities(media_players)
 
     platform = entity_platform.async_get_current_platform()
+
+    platform.async_register_entity_service(SERVICE_SEARCH, SEARCH_SCHEMA, "search")
+    platform.async_register_entity_service(SERVICE_TTS, TTS_SCHEMA, "tts")
     platform.async_register_entity_service(
-        SERVICE_SEARCH,
-        SEARCH_SCHEMA,
-        "search",
+        SERVICE_DOORBELL, DOORBELL_SCHEMA, "doorbell"
     )
 
 
@@ -303,6 +321,7 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
 
     @property
     def media_image_remotely_accessible(self):
+        """Return whether image is accessible outside of the home network."""
         return True
 
     @property
@@ -451,7 +470,7 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
             media_content_id,
         )
 
-    async def async_play_media(self, media_type, media_id):
+    async def async_play_media(self, media_type, media_id, **kwargs):
         """Send the play_media command to the media player."""
         _LOGGER.debug("Playback request for %s / %s", media_type, media_id)
         await self.coordinator.data.play_media(self.zone_id, media_id)
@@ -462,23 +481,33 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
         await self.coordinator.data.clear_playlist(self.zone.SourceID)
 
     async def search(self, **kwargs):
-        """Emulate opening the search screen and entering the search keyword."""
+        """Search Artist, Album, Tracks to play."""
         query = {}
         mode = "add"
 
         if isinstance(kwargs.get("mode"), str):
             mode = kwargs["mode"].strip()
 
-        if isinstance(kwargs.get("keyword_album"), str):
-            query["album"] = kwargs["keyword_album"].strip()
-
         if isinstance(kwargs.get("keyword_artist"), str):
             query["artist"] = kwargs["keyword_artist"].strip()
+
+        if isinstance(kwargs.get("keyword_album"), str):
+            query["album"] = kwargs["keyword_album"].strip()
 
         if isinstance(kwargs.get("keyword_track_name"), str):
             query["track"] = kwargs["keyword_track_name"].strip()
 
-        media_id = await self.coordinator.data.search_media(self._zone_id, query)
+        media = await self.coordinator.data.search_media(self._zone_id, query)
+        _LOGGER.debug("Found %s", media)
 
-        if media_id:
-            await self.coordinator.data.queue_media(self.zone_id, media_id, mode)
+        if media["ID"]:
+            await self.coordinator.data.queue_media(self.zone_id, media["ID"], mode)
+
+    async def tts(self, **kwargs):
+        """TTS service via CasaTunes."""
+        if isinstance(kwargs.get("input"), str):
+            await self.coordinator.data.tts(self.zone_id, kwargs)
+
+    async def doorbell(self, **kwargs):
+        """Doorbell service via CasaTunes."""
+        await self.coordinator.data.doorbell(self.zone_id, kwargs)

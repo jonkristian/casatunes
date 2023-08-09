@@ -1,34 +1,29 @@
 search:
   name: Search
   description: Search for and add media in various ways.
-
   target:
     entity:
       integration: casatunes
       domain: media_player
   fields:
-
     keyword_artist:
       name: Search artist
       description: The keywords to search for in artists.
       example: The Beatles
       selector:
         text:
-
     keyword_album:
       name: Search album title
       description: The keywords to search for in album titles.
       example: The White Album
       selector:
         text:
-
     keyword_track_name:
       name: Search track name
       description: The keywords to search for in track names.
       example: Helter Skelter
       selector:
         text:
-
     mode:
       name: Play mode
       description: "
@@ -42,3 +37,111 @@ search:
       example: add
       selector:
         text:
+
+tts:
+  name: TTS
+  description: Text-to-speech service.
+  target:
+    entity:
+      integration: casatunes
+      domain: media_player
+  fields:
+    input:
+      name: Input
+      description:
+        Specifies the Text or SSML to play.
+        More information (https://cloud.google.com/text-to-speech/docs/ssml).
+      selector:
+        text:
+          multiline: true
+    language_code:
+      name: Language Code
+      description:
+        Specifies the language code to use.
+        More information (https://cloud.google.com/speech-to-text/docs/languages).
+      selector:
+        text:
+    gender:
+      name: Gender
+      description:
+        Specifies the gender to use when speaking (MALE, FEMALE, NEUTRAL)
+      selector:
+        select:
+          mode: dropdown
+          options:
+            - "Male"
+            - "Female"
+            - "Neutral"
+    voice:
+      name: Voice
+      description:
+        Specifies the voice to use.
+        More information (http://your-casatunes-ip:8735/api/v1/system/tts/voices?languageCode=en-US).
+      selector:
+        text:
+    pre_wait:
+      name: Pre-wait
+      description: Specifies time to wait in seconds after powering before playing.
+      example:
+      selector:
+        number:
+          min: 0
+          max: 5
+    post_wait:
+      name: Post-wait
+      description: Specifies time to wait in seconds before powering off (to avoid clipping).
+      example:
+      selector:
+        number:
+          min: 0
+          max: 5
+    volume:
+      name: Volume
+      description: Specifies the volume to use for the room or room group.
+      example:
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+
+doorbell:
+  name: Doorbell
+  description: Play the specified doorbell chime in the specified room or room group.
+  target:
+    entity:
+      integration: casatunes
+      domain: media_player
+  fields:
+    chime:
+      name: Chime
+      description:
+        Specifies the name of the doorbell chime to play (filename without extension).
+        See available chimes here (http://your-casatunes-ip:8735/api/v1/system/doorbell/chimes).
+      selector:
+        text:
+    pre_wait:
+      name: Pre-wait
+      description: Specifies time to wait in seconds after powering on the zones and before playing the chime.
+      example:
+      selector:
+        number:
+          min: 0
+          max: 5
+    post_wait:
+      name: Post-wait
+      description: Specifies time to wait in seconds before powering off the zones and after chime completed (to avoid clipping).
+      example:
+      selector:
+        number:
+          min: 0
+          max: 5
+    volume:
+      name: Volume
+      description: Specifies the volume to use for the room or room group.
+      example:
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"

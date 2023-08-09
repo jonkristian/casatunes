@@ -6,7 +6,7 @@
   "issue_tracker": "https://github.com/jonkristian/casatunes/issues",
   "version": "0.1.6",
   "requirements": [
-    "pycasatunes==0.1.4"
+    "pycasatunes==0.1.5"
   ],
   "ssdp": [
     {
