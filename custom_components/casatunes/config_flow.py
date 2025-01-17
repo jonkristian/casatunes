@@ -89,10 +89,10 @@ class CasaTunesConfigFlow(ConfigFlow, domain=DOMAIN):
             )
 
         await self.async_set_unique_id(format_mac(info["mac_address"]))
-        self._abort_if_unique_id_configured(updates={CONF_HOST: user_input[CONF_HOST]})
+        self._abort_if_unique_id_configured(updates = {CONF_HOST: user_input[CONF_HOST]})
 
         return self.async_create_entry(
-            title=info["title"],
+            title=info["title"], 
             data=user_input,
         )
 
@@ -141,6 +141,6 @@ class CasaTunesConfigFlow(ConfigFlow, domain=DOMAIN):
 
         with async_timeout.timeout(30):
             system = await casa.get_system()
-
+        
         if system.MACAddress is not None:
             return system.MACAddress

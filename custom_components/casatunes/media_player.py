@@ -6,36 +6,15 @@ import logging
 import voluptuous as vol
 
 from homeassistant.util.dt import utcnow
-from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from pycasatunes.objects.zone import CasaTunesZone
 
 from homeassistant.components.media_player import (
-    DEVICE_CLASS_SPEAKER,
+    MediaPlayerDeviceClass,
+    MediaType,
     MediaPlayerEntity,
-)
-
-from homeassistant.components.media_player.const import (
-    SUPPORT_BROWSE_MEDIA,
-    MEDIA_TYPE_MUSIC,
-    MEDIA_TYPE_PLAYLIST,
-    SUPPORT_CLEAR_PLAYLIST,
-    SUPPORT_GROUPING,
-    SUPPORT_NEXT_TRACK,
-    SUPPORT_PAUSE,
-    SUPPORT_PLAY,
-    SUPPORT_PLAY_MEDIA,
-    SUPPORT_PREVIOUS_TRACK,
-    SUPPORT_SEEK,
-    SUPPORT_SELECT_SOURCE,
-    # SUPPORT_SELECT_SOUND_MODE,
-    SUPPORT_SHUFFLE_SET,
-    SUPPORT_STOP,
-    SUPPORT_TURN_OFF,
-    SUPPORT_TURN_ON,
-    SUPPORT_VOLUME_MUTE,
-    SUPPORT_VOLUME_SET,
+    MediaPlayerEntityFeature,  # Import the new enums
 )
 
 from homeassistant.const import (
@@ -48,54 +27,33 @@ from homeassistant.const import (
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers import entity_platform
 
-from .const import DOMAIN, SERVICE_SEARCH, SERVICE_TTS, SERVICE_DOORBELL
+from .const import ATTR_KEYWORD, DOMAIN, SERVICE_SEARCH
 from .browse_media import build_item_response
 from . import CasaTunesDataUpdateCoordinator, CasaTunesDeviceEntity
 
 SUPPORT_CASATUNES = (
-    SUPPORT_BROWSE_MEDIA
-    | SUPPORT_CLEAR_PLAYLIST
-    | SUPPORT_GROUPING
-    | SUPPORT_NEXT_TRACK
-    | SUPPORT_PAUSE
-    | SUPPORT_PLAY
-    | SUPPORT_PLAY_MEDIA
-    | SUPPORT_PREVIOUS_TRACK
-    | SUPPORT_SEEK
-    | SUPPORT_SELECT_SOURCE
-    | SUPPORT_SHUFFLE_SET
-    | SUPPORT_STOP
-    | SUPPORT_TURN_OFF
-    | SUPPORT_TURN_ON
-    | SUPPORT_VOLUME_MUTE
-    | SUPPORT_VOLUME_SET
+    MediaPlayerEntityFeature.BROWSE_MEDIA |
+    MediaPlayerEntityFeature.CLEAR_PLAYLIST |
+    MediaPlayerEntityFeature.GROUPING |
+    MediaPlayerEntityFeature.NEXT_TRACK |
+    MediaPlayerEntityFeature.PAUSE |
+    MediaPlayerEntityFeature.PLAY |
+    MediaPlayerEntityFeature.PLAY_MEDIA |
+    MediaPlayerEntityFeature.PREVIOUS_TRACK |
+    MediaPlayerEntityFeature.SEEK |
+    MediaPlayerEntityFeature.SELECT_SOURCE |
+    MediaPlayerEntityFeature.SHUFFLE_SET |
+    MediaPlayerEntityFeature.STOP |
+    MediaPlayerEntityFeature.TURN_OFF |
+    MediaPlayerEntityFeature.TURN_ON |
+    MediaPlayerEntityFeature.VOLUME_MUTE |
+    MediaPlayerEntityFeature.VOLUME_SET
 )
+
 
 STATUS_TO_STATES = {0: STATE_IDLE, 1: STATE_PAUSED, 2: STATE_PLAYING, 3: STATE_ON}
 
-SEARCH_SCHEMA = {
-    vol.Optional("mode"): cv.string,
-    vol.Optional("keyword_album"): cv.string,
-    vol.Optional("keyword_artist"): cv.string,
-    vol.Optional("keyword_track_name"): cv.string,
-}
-
-TTS_SCHEMA = {
-    vol.Required("input"): cv.string,
-    vol.Optional("language_code"): cv.string,
-    vol.Optional("gender"): cv.string,
-    vol.Optional("voice"): cv.string,
-    vol.Optional("pre_wait"): cv.positive_int,
-    vol.Optional("post_wait"): cv.positive_int,
-    vol.Optional("volume"): cv.positive_int,
-}
-
-DOORBELL_SCHEMA = {
-    vol.Optional("chime"): cv.string,
-    vol.Optional("pre_wait"): cv.positive_int,
-    vol.Optional("post_wait"): cv.positive_int,
-    vol.Optional("volume"): cv.positive_int,
-}
+SEARCH_SCHEMA = {vol.Required(ATTR_KEYWORD): str}
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -114,11 +72,10 @@ async def async_setup_entry(hass, entry, async_add_entities):
     async_add_entities(media_players)
 
     platform = entity_platform.async_get_current_platform()
-
-    platform.async_register_entity_service(SERVICE_SEARCH, SEARCH_SCHEMA, "search")
-    platform.async_register_entity_service(SERVICE_TTS, TTS_SCHEMA, "tts")
     platform.async_register_entity_service(
-        SERVICE_DOORBELL, DOORBELL_SCHEMA, "doorbell"
+        SERVICE_SEARCH,
+        SEARCH_SCHEMA,
+        "search",
     )
 
 
@@ -193,7 +150,7 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
     @property
     def device_class(self) -> str | None:
         """Return the class of this device."""
-        return DEVICE_CLASS_SPEAKER
+        return "speaker"
 
     @property
     def name(self) -> str | None:
@@ -307,7 +264,7 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
     @property
     def media_content_type(self):
         """Content type of current playing media."""
-        return MEDIA_TYPE_MUSIC
+        return MediaType.PLAYLIST
         # return MEDIA_TYPE_PLAYLIST
 
     @property
@@ -321,7 +278,6 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
 
     @property
     def media_image_remotely_accessible(self):
-        """Return whether image is accessible outside of the home network."""
         return True
 
     @property
@@ -423,7 +379,7 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
         """Select input source."""
         for source_item in self.coordinator.data.sources:
             if source_item.Name == source:
-                # If zone is a client on a zone, we should leave.
+                """If zone is a client on a zone, we should leave."""
                 await self.coordinator.data.change_source(
                     self.zone_id, source_item.SourceID
                 )
@@ -439,7 +395,7 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
             str(group_members),
         )
 
-        # Make sure self.zone is or becomes master.
+        """Make sure self.zone is or becomes master."""
         await self.coordinator.data.zone_master(self.zone_id, True)
 
         entities = [
@@ -480,34 +436,6 @@ class CasaTunesMediaPlayer(CasaTunesDeviceEntity, MediaPlayerEntity):
         """Send the media player the command for clear playlist."""
         await self.coordinator.data.clear_playlist(self.zone.SourceID)
 
-    async def search(self, **kwargs):
-        """Search Artist, Album, Tracks to play."""
-        query = {}
-        mode = "add"
-
-        if isinstance(kwargs.get("mode"), str):
-            mode = kwargs["mode"].strip()
-
-        if isinstance(kwargs.get("keyword_artist"), str):
-            query["artist"] = kwargs["keyword_artist"].strip()
-
-        if isinstance(kwargs.get("keyword_album"), str):
-            query["album"] = kwargs["keyword_album"].strip()
-
-        if isinstance(kwargs.get("keyword_track_name"), str):
-            query["track"] = kwargs["keyword_track_name"].strip()
-
-        media = await self.coordinator.data.search_media(self._zone_id, query)
-        _LOGGER.debug("Found %s", media)
-
-        if media["ID"]:
-            await self.coordinator.data.queue_media(self.zone_id, media["ID"], mode)
-
-    async def tts(self, **kwargs):
-        """TTS service via CasaTunes."""
-        if isinstance(kwargs.get("input"), str):
-            await self.coordinator.data.tts(self.zone_id, kwargs)
-
-    async def doorbell(self, **kwargs):
-        """Doorbell service via CasaTunes."""
-        await self.coordinator.data.doorbell(self.zone_id, kwargs)
+    async def search(self, keyword):
+        """Emulate opening the search screen and entering the search keyword."""
+        await self.coordinator.data.search_media(self.zone_id, keyword)
